@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  cnpj-downloader:
+    build: .
+    container_name: cnpj-downloader
+    volumes:
+      # Volume para persistir downloads
+      - ./downloads:/app/downloads
+      # Volume para persistir arquivos extraídos
+      - ./extracted:/app/extracted
+      # Volume para logs
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+    restart: unless-stopped
+    command: python cnpj_downloader.py
+
+  cnpj-manager:
+    build: .
+    container_name: cnpj-manager
+    volumes:
+      - ./downloads:/app/downloads
+      - ./extracted:/app/extracted
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+    restart: "no"
+    command: python cnpj_manager.py status
+
+  cnpj-test:
+    build: .
+    container_name: cnpj-test
+    volumes:
+      - ./downloads:/app/downloads
+      - ./extracted:/app/extracted
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: "no"
+    command: python test_downloader.py
+
+volumes:
+  downloads:
+  extracted:
+  logs: 

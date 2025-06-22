@@ -1,6 +1,7 @@
 # Diretórios de dados
 downloads/
 extracted/
+logs/
 
 # Logs
 *.log
@@ -69,4 +70,8 @@ settings.local.py
 *.dat
 *.db
 *.sqlite
-*.sqlite3 
+*.sqlite3
+
+# Docker (manter arquivos de configuração, ignorar volumes)
+# Dockerfile e docker-compose.yml são mantidos
+# Volumes são ignorados automaticamente pelos diretórios acima 
