@@ -1,22 +1,31 @@
+# =============================================================
+# Docker Compose para Dados Abertos do CNPJ
+# Todos os serviços são INDEPENDENTES: download, importação e dashboard
+# podem ser executados separadamente, em qualquer ordem, sem dependências.
+# Use os comandos abaixo para rodar cada etapa conforme necessário:
+#   docker-compose up cnpj-downloader   # Download e extração dos dados
+#   docker-compose up cnpj-parquet      # Conversão para Parquet
+#   docker-compose up dashboard         # Dashboard interativo
+# =============================================================
 version: '3.8'
 
 services:
+  # Downloader: Baixa e extrai os arquivos da Receita Federal
   cnpj-downloader:
     build: .
     container_name: cnpj-downloader
     volumes:
-      # Volume para persistir downloads
       - ./downloads:/app/downloads
-      # Volume para persistir arquivos extraídos
       - ./extracted:/app/extracted
-      # Volume para logs
       - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=America/Sao_Paulo
+      - LOG_DIR=/app/logs
     restart: unless-stopped
     command: python cnpj_downloader.py
 
+  # Manager: Utilitários de status, listagem e download de mês específico
   cnpj-manager:
     build: .
     container_name: cnpj-manager
@@ -27,19 +36,49 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=America/Sao_Paulo
+      - LOG_DIR=/app/logs
     restart: "no"
     command: python cnpj_manager.py status
 
+  # Importador Parquet: Converte arquivos extraídos para Parquet
+  cnpj-parquet:
+    build: .
+    container_name: cnpj-parquet
+    volumes:
+      - ./extracted:/app/extracted:ro
+      - ./parquet:/app/parquet
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=America/Sao_Paulo
+      - LOG_DIR=/app/logs
+    restart: "no"
+    command: python import_to_parquet.py
+
+  # Testes: Scripts de teste e validação
   cnpj-test:
     build: .
     container_name: cnpj-test
     volumes:
       - ./downloads:/app/downloads
       - ./extracted:/app/extracted
+      - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
+      - LOG_DIR=/app/logs
     restart: "no"
     command: python test_downloader.py
+
+  # Dashboard: Visualização interativa dos dados Parquet
+  dashboard:
+    build: .
+    command: streamlit run dashboard.py --server.port=8501 --server.address=0.0.0.0
+    volumes:
+      - ./parquet:/app/parquet
+      - ./dashboard.py:/app/dashboard.py
+      - ./metadata.py:/app/metadata.py
+    ports:
+      - "8501:8501"
 
 volumes:
   downloads:

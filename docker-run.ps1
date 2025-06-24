@@ -1,160 +1,120 @@
-# Script PowerShell para executar comandos do CNPJ Downloader com Docker
+# Script para executar comandos do CNPJ Downloader com Docker
 
-param(
-    [Parameter(Position=0)]
-    [string]$Command,
-    
-    [Parameter(Position=1)]
-    [string]$Month
-)
+# --- Configuração ---
+$DockerComposeFile = "docker-compose.yml"
 
-# Função para mostrar ajuda
+# --- Funções Auxiliares ---
 function Show-Help {
-    Write-Host "CNPJ Downloader - Docker Script (PowerShell)" -ForegroundColor Blue
+    Write-Host "CNPJ Downloader - Docker Script" -ForegroundColor Blue
     Write-Host ""
-    Write-Host "Uso: .\docker-run.ps1 [COMANDO] [OPÇÕES]"
+    Write-Host "Uso: .\\docker-run.ps1 [COMANDO]"
     Write-Host ""
     Write-Host "Comandos disponíveis:"
-    Write-Host "  build           - Construir a imagem Docker"
-    Write-Host "  download        - Executar download automático"
-    Write-Host "  download-month  - Download de mês específico (ex: .\docker-run.ps1 download-month 2024-01)"
-    Write-Host "  status          - Verificar status dos downloads"
-    Write-Host "  test            - Executar testes"
-    Write-Host "  clean-downloads - Limpar arquivos baixados"
-    Write-Host "  clean-extracted - Limpar arquivos extraídos"
-    Write-Host "  clean-all       - Limpar todos os arquivos"
-    Write-Host "  shell           - Abrir shell no container"
-    Write-Host "  logs            - Ver logs do container"
-    Write-Host "  stop            - Parar containers"
-    Write-Host "  help            - Mostrar esta ajuda"
-    Write-Host ""
-    Write-Host "Exemplos:"
-    Write-Host "  .\docker-run.ps1 build"
-    Write-Host "  .\docker-run.ps1 download"
-    Write-Host "  .\docker-run.ps1 download-month 2024-01"
-    Write-Host "  .\docker-run.ps1 status"
-    Write-Host "  .\docker-run.ps1 test"
+    Write-Host "  build            - Constrói as imagens Docker"
+    Write-Host "  download         - Baixa e extrai os arquivos de dados"
+    Write-Host "  status           - Verifica o status dos arquivos baixados"
+    Write-Host "  import-parquet   - Converte os arquivos extraídos para Parquet"
+    Write-Host "  list [tipo]      - Lista arquivos extraídos (filtra por tipo, ex: 'empresas')"
+    Write-Host "  clean            - Limpa todos os dados (downloads, extraídos, parquet)"
+    Write-Host "  shell            - Abre um shell interativo no container principal"
+    Write-Host "  stop             - Para todos os serviços"
+    Write-Host "  all              - Executa o pipeline completo: download > import-parquet"
+    Write-Host "  help             - Mostra esta mensagem de ajuda"
 }
 
-# Função para construir imagem
-function Build-Image {
-    Write-Host "🔨 Construindo imagem Docker..." -ForegroundColor Yellow
-    docker-compose build
-    Write-Host "✅ Imagem construída com sucesso!" -ForegroundColor Green
+function Build-Images {
+    Write-Host "🔨 Construindo imagens Docker..." -ForegroundColor Yellow
+    docker-compose -f $DockerComposeFile build
+    Write-Host "✅ Imagens construídas com sucesso!" -ForegroundColor Green
 }
 
-# Função para executar download
 function Run-Download {
-    Write-Host "📥 Iniciando download automático..." -ForegroundColor Yellow
-    docker-compose run --rm cnpj-downloader python cnpj_downloader.py
+    Write-Host "📥 Baixando e extraindo dados..." -ForegroundColor Yellow
+    docker-compose -f $DockerComposeFile run --rm cnpj-downloader
+    Write-Host "✅ Download e extração concluídos!" -ForegroundColor Green
 }
 
-# Função para download de mês específico
-function Run-DownloadMonth {
-    param([string]$Month)
-    
-    if ([string]::IsNullOrEmpty($Month)) {
-        Write-Host "❌ Erro: Especifique o mês (formato: YYYY-MM)" -ForegroundColor Red
-        Write-Host "Exemplo: .\docker-run.ps1 download-month 2024-01"
-        exit 1
-    }
-    
-    Write-Host "📥 Baixando dados do mês: $Month" -ForegroundColor Yellow
-    docker-compose run --rm cnpj-downloader python cnpj_manager.py download-month --month $Month
-}
-
-# Função para verificar status
 function Run-Status {
     Write-Host "📊 Verificando status..." -ForegroundColor Yellow
-    docker-compose run --rm cnpj-manager python cnpj_manager.py status
+    docker-compose -f $DockerComposeFile run --rm cnpj-manager python cnpj_manager.py status
 }
 
-# Função para executar testes
-function Run-Test {
-    Write-Host "🧪 Executando testes..." -ForegroundColor Yellow
-    docker-compose run --rm cnpj-test python test_downloader.py
+function Import-Parquet {
+    Write-Host "📦 Convertendo dados para Parquet..." -ForegroundColor Yellow
+    # Garante que o serviço esteja de pé e com a imagem mais recente
+    docker-compose -f $DockerComposeFile up --build -d cnpj-parquet
+    # Executa o script de importação dentro do container que está rodando
+    docker-compose -f $DockerComposeFile exec cnpj-parquet python import_to_parquet.py
+    Write-Host "✅ Conversão para Parquet concluída! Arquivos em ./parquet." -ForegroundColor Green
 }
 
-# Função para limpeza
+function Run-List ($type) {
+    Write-Host "🔎 Listando arquivos para o tipo: $type..." -ForegroundColor Yellow
+    docker-compose -f $DockerComposeFile run --rm cnpj-manager python cnpj_manager.py list "$type"
+}
+
 function Run-Clean {
-    param([string]$Type)
-    
-    switch ($Type) {
-        "downloads" {
-            Write-Host "🗑️  Limpando downloads..." -ForegroundColor Yellow
-            docker-compose run --rm cnpj-manager python cnpj_manager.py clean-downloads
-        }
-        "extracted" {
-            Write-Host "🗑️  Limpando arquivos extraídos..." -ForegroundColor Yellow
-            docker-compose run --rm cnpj-manager python cnpj_manager.py clean-extracted
-        }
-        "all" {
-            Write-Host "🗑️  Limpando todos os arquivos..." -ForegroundColor Yellow
-            docker-compose run --rm cnpj-manager python cnpj_manager.py clean-all
-        }
-        default {
-            Write-Host "❌ Opção de limpeza inválida" -ForegroundColor Red
-            exit 1
-        }
+    Write-Host "🗑️  Limpando todos os dados..." -ForegroundColor Yellow
+    docker-compose -f $DockerComposeFile run --rm cnpj-manager python cnpj_manager.py clean-all
+    if (Test-Path -Path "parquet") {
+        Remove-Item -Recurse -Force parquet/*
+        Write-Host "Diretório 'parquet' limpo." -ForegroundColor Yellow
     }
+    Write-Host "✅ Limpeza concluída!" -ForegroundColor Green
 }
 
-# Função para abrir shell
 function Run-Shell {
-    Write-Host "🐚 Abrindo shell no container..." -ForegroundColor Yellow
-    docker-compose run --rm cnpj-downloader /bin/bash
+    Write-Host "🐚 Abrindo shell no container 'cnpj-manager'..." -ForegroundColor Yellow
+    docker-compose -f $DockerComposeFile run --rm cnpj-manager /bin/bash
 }
 
-# Função para ver logs
-function Run-Logs {
-    Write-Host "📄 Mostrando logs..." -ForegroundColor Yellow
-    docker-compose logs cnpj-downloader
-}
-
-# Função para parar containers
 function Run-Stop {
-    Write-Host "🛑 Parando containers..." -ForegroundColor Yellow
-    docker-compose down
-    Write-Host "✅ Containers parados!" -ForegroundColor Green
+    Write-Host "🛑 Parando todos os serviços..." -ForegroundColor Yellow
+    docker-compose -f $DockerComposeFile down
+    Write-Host "✅ Serviços parados!" -ForegroundColor Green
 }
 
-# Verificar se Docker está instalado
-function Test-Docker {
-    try {
-        $null = Get-Command docker -ErrorAction Stop
-        $null = Get-Command docker-compose -ErrorAction Stop
-    }
-    catch {
-        Write-Host "❌ Docker ou Docker Compose não está instalado!" -ForegroundColor Red
+# --- Função Principal ---
+function Main {
+    param($Command, $Args)
+
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue) -or -not (Get-Command docker-compose -ErrorAction SilentlyContinue)) {
+        Write-Host "❌ Docker e/ou Docker Compose não estão instalados. Por favor, instale-os para continuar." -ForegroundColor Red
         exit 1
     }
-}
 
-# Função principal
-function Main {
-    Test-Docker
-    
     switch ($Command) {
-        "build" { Build-Image }
-        "download" { Run-Download }
-        "download-month" { Run-DownloadMonth $Month }
-        "status" { Run-Status }
-        "test" { Run-Test }
-        "clean-downloads" { Run-Clean "downloads" }
-        "clean-extracted" { Run-Clean "extracted" }
-        "clean-all" { Run-Clean "all" }
-        "shell" { Run-Shell }
-        "logs" { Run-Logs }
-        "stop" { Run-Stop }
-        { $_ -in @("help", "-h", "--help") -or [string]::IsNullOrEmpty($_) } { Show-Help }
+        "build"          { Build-Images }
+        "download"       { Run-Download }
+        "status"         { Run-Status }
+        "import-parquet" { Import-Parquet }
+        "list"           {
+            if ($Args.Count -eq 0) {
+                Write-Host "Erro: Especifique o tipo de arquivo para listar." -ForegroundColor Red
+                exit 1
+            }
+            Run-List $Args[0]
+        }
+        "clean"          { Run-Clean }
+        "shell"          { Run-Shell }
+        "stop"           { Run-Stop }
+        "all"            {
+            Write-Host "🚀 Executando pipeline completo..." -ForegroundColor Blue
+            Run-Download
+            Import-Parquet
+            Write-Host "🎉 Pipeline concluído com sucesso!" -ForegroundColor Green
+        }
         default {
-            Write-Host "❌ Comando inválido: $Command" -ForegroundColor Red
-            Write-Host ""
-            Show-Help
-            exit 1
+            if ($null -eq $Command -or "" -eq $Command -or "help" -eq $command) {
+                Show-Help
+            } else {
+                Write-Host "❌ Comando inválido: $Command" -ForegroundColor Red
+                Show-Help
+                exit 1
+            }
         }
     }
 }
 
-# Executar função principal
-Main 
+# Executa a função principal, passando os argumentos do script
+Main $args[0] $args[1..($args.Length-1)] 

@@ -15,17 +15,38 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 import time
+import pytz
 
-# Configuração de logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('cnpj_downloader.log'),
-        logging.StreamHandler()
-    ]
-)
+# Constantes de diretório
+DOWNLOAD_DIR = "downloads"
+EXTRACT_DIR = "extracted"
+LOG_FILE = "cnpj_downloader.log"
+
+class SaoPauloFormatter(logging.Formatter):
+    def converter(self, timestamp):
+        dt = datetime.fromtimestamp(timestamp, pytz.timezone('America/Sao_Paulo'))
+        return dt
+
+    def formatTime(self, record, datefmt=None):
+        dt = self.converter(record.created)
+        if datefmt:
+            s = dt.strftime(datefmt)
+        else:
+            s = dt.isoformat()
+        return s
+
+# Substituir a configuração do basicConfig por configuração manual com o formatter customizado
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if logger.hasHandlers():
+    logger.handlers.clear()
+formatter = SaoPauloFormatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler = logging.FileHandler(LOG_FILE)
+file_handler.setFormatter(formatter)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 class CNPJDownloader:
     def __init__(self, base_url="https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/"):
@@ -35,9 +56,9 @@ class CNPJDownloader:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         
-        # Criar diretórios se não existirem
-        self.download_dir = "downloads"
-        self.extract_dir = "extracted"
+        # Usar constantes para os diretórios
+        self.download_dir = DOWNLOAD_DIR
+        self.extract_dir = EXTRACT_DIR
         self._create_directories()
     
     def _create_directories(self):

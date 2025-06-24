@@ -1,14 +1,85 @@
-# CNPJ Data Downloader
+# 📂 Downloader de Dados Abertos do CNPJ
 
-Aplicativo Python para fazer web scraping e download dos dados abertos do CNPJ da Receita Federal.
+Este projeto contém um conjunto de scripts Python para baixar, extrair e converter os [Dados Abertos de CNPJ](https://www.gov.br/receitafederal/pt-br/assuntos/orientacao-tributaria/cadastros/consultas/dados-publicos-cnpj) da Receita Federal para o formato Parquet, otimizado para análise de dados.
 
-## 📋 Descrição
+Todo o processo é orquestrado com Docker para garantir um ambiente consistente e facilitar a execução.
 
-Este projeto automatiza o processo de:
-1. **Web Scraping** da página oficial da Receita Federal
-2. **Identificação** do diretório mais recente (formato YYYY-MM)
-3. **Download** de todos os arquivos do diretório
-4. **Extração** automática dos arquivos compactados
+## 🚀 Como Usar (Docker)
+
+A forma recomendada de usar este projeto é através dos scripts de execução, que gerenciam os contêineres Docker.
+
+### Pré-requisitos
+- [Docker](https://www.docker.com/get-started/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+### Comandos Principais
+
+Abra um terminal na raiz do projeto e execute um dos comandos abaixo.
+
+> **Nota:** No Windows, use `.\\docker-run.ps1`. No Linux ou macOS, use `./docker-run.sh`.
+
+| Comando | Descrição |
+|---------|-----------|
+| `all` | **(Recomendado)** Executa o pipeline completo: baixa, extrai e converte os dados para Parquet. |
+| `download` | Apenas baixa e extrai os arquivos da Receita Federal. |
+| `import-parquet` | Converte os arquivos já extraídos para o formato Parquet. |
+| `status` | Mostra um resumo dos arquivos já baixados e extraídos. |
+| `list [tipo]` | Lista os caminhos dos arquivos de um tipo específico (ex: `list empresas`). |
+| `clean` | Apaga todos os dados baixados, extraídos e os arquivos Parquet. |
+| `build` | Força a reconstrução das imagens Docker. |
+| `shell` | Abre um terminal interativo dentro do contêiner de gerenciamento. |
+| `stop` | Para todos os contêineres em execução. |
+
+### Como importar para Parquet
+
+Para converter os arquivos extraídos para o formato Parquet, execute:
+
+**Windows (PowerShell):**
+```powershell
+.\docker-run.ps1 import-parquet
+```
+
+**Linux / macOS:**
+```bash
+./docker-run.sh import-parquet
+```
+
+Os arquivos Parquet serão gerados na pasta `parquet/`.
+
+### Exemplo de Execução Completa
+
+Para executar todo o processo, do download à conversão para Parquet:
+
+**Windows (PowerShell):**
+```powershell
+.\\docker-run.ps1 all
+```
+
+**Linux / macOS:**
+```bash
+./docker-run.sh all
+```
+
+Os arquivos Parquet finais serão salvos no diretório `./parquet`.
+
+## 📁 Estrutura de Diretórios
+
+- `downloads/`: Armazena os arquivos `.zip` baixados da Receita.
+- `extracted/`: Contém os arquivos `.csv` extraídos.
+- `parquet/`: Guarda os arquivos `.parquet` convertidos, prontos para análise.
+- `logs/`: Registra os logs de execução dos processos.
+- `metadata.py`: Arquivo central com os layouts e nomes de tabelas dos dados.
+
+## 🔧 Scripts Principais
+
+- `cnpj_downloader.py`: Responsável por encontrar o link mais recente, baixar e extrair os arquivos.
+- `cnpj_manager.py`: Fornece comandos auxiliares como `status` e `list`.
+- `import_to_parquet.py`: Converte os arquivos de texto para o formato Parquet de forma otimizada.
+
+## ⚠️ Considerações
+
+- **Espaço em Disco:** O conjunto completo de dados CNPJ é extremamente grande (mais de 100 GB). Certifique-se de ter espaço suficiente.
+- **Tempo de Execução:** O processo de download e conversão pode levar várias horas, dependendo da sua conexão com a internet e da performance do seu computador.
 
 ## 🐳 Docker (Recomendado)
 
@@ -66,41 +137,7 @@ cd dados-abertos-cnpj
 | `shell` | Abrir shell no container |
 | `logs` | Ver logs do container |
 | `stop` | Parar containers |
-
-### Exemplos de Uso com Docker
-
-```bash
-# Download do mês mais recente
-./docker-run.sh download
-
-# Download de janeiro de 2024
-./docker-run.sh download-month 2024-01
-
-# Verificar status
-./docker-run.sh status
-
-# Executar testes
-./docker-run.sh test
-
-# Limpar downloads antigos
-./docker-run.sh clean-downloads
-```
-
-### Usando Docker Compose Diretamente
-
-```bash
-# Construir e executar download
-docker-compose up cnpj-downloader
-
-# Executar em background
-docker-compose up -d cnpj-downloader
-
-# Ver logs
-docker-compose logs cnpj-downloader
-
-# Parar containers
-docker-compose down
-```
+| `help` | Mostrar ajuda |
 
 ## 🐍 Instalação Local (Alternativa)
 
@@ -193,7 +230,8 @@ dados_abertos_cnpj/
 │   └── YYYY-MM/        # Organizados por mês
 ├── extracted/          # Arquivos extraídos
 │   └── YYYY-MM/        # Organizados por mês
-├── logs/              # Logs do sistema
+├── parquet/            # Arquivos convertidos para Parquet (ex: empresas.parquet)
+├── logs/               # Logs do sistema
 ├── cnpj_downloader.log # Log de execução
 ├── cnpj_downloader.py  # Script principal
 ├── cnpj_manager.py     # Script de gerenciamento
@@ -209,25 +247,81 @@ dados_abertos_cnpj/
 
 ## 🔧 Funcionalidades
 
-### CNPJDownloader (cnpj_downloader.py)
-- **Web Scraping** automático da página da Receita Federal
-- **Detecção** do diretório mais recente
-- **Download** com barra de progresso
-- **Extração** automática de arquivos ZIP
-- **Logging** detalhado de todas as operações
-- **Tratamento de erros** robusto
+O sistema oferece as seguintes funcionalidades principais:
 
-### CNPJManager (cnpj_manager.py)
-- **Status** dos downloads e extrações
-- **Download** de meses específicos
-- **Limpeza** seletiva de arquivos
-- **Interface** de linha de comando intuitiva
+- **Download automático dos dados mais recentes do CNPJ**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh download
+    # ou
+    .\docker-run.ps1 download
+    ```
 
-### Docker
-- **Containerização** completa da aplicação
-- **Volumes** para persistência de dados
-- **Scripts** automatizados para Linux/Mac/Windows
-- **Orquestração** com Docker Compose
+- **Download de um mês específico**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh download-month 2024-01
+    # ou
+    python cnpj_manager.py download-month --month 2024-01
+    ```
+
+- **Extração automática dos arquivos ZIP baixados**
+  - Ocorre automaticamente após o download.
+
+- **Verificação de status dos arquivos baixados e extraídos**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh status
+    # ou
+    .\docker-run.ps1 status
+    ```
+
+- **Listagem de arquivos extraídos por tipo de tabela**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh list empresas
+    # ou
+    .\docker-run.ps1 list estabelecimentos
+    ```
+
+- **Limpeza seletiva ou total dos dados (downloads, extraídos, Parquet)**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh clean
+    # ou
+    .\docker-run.ps1 clean
+    ```
+
+- **Conversão eficiente dos arquivos extraídos para o formato Parquet**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh import-parquet
+    # ou
+    .\docker-run.ps1 import-parquet
+    ```
+  - Os arquivos Parquet são salvos em `parquet/` e podem ser lidos em Python, Spark, DuckDB, DBeaver, etc.
+
+- **Execução do pipeline completo (download, extração e conversão para Parquet) em um único comando**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh all
+    # ou
+    .\docker-run.ps1 all
+    ```
+
+- **Abertura de shell interativo no container para inspeção avançada**
+  - Exemplo:
+    ```bash
+    ./docker-run.sh shell
+    # ou
+    .\docker-run.ps1 shell
+    ```
+
+- **Logs detalhados de todas as operações**
+  - Os logs são salvos em `logs/` e exibidos no console durante a execução.
+
+- **Configuração e execução totalmente automatizadas via Docker Compose**
+  - Não é necessário instalar dependências Python localmente.
 
 ## 📊 Logs
 
@@ -349,4 +443,23 @@ Contribuições são bem-vindas! Sinta-se à vontade para:
 
 ---
 
-**Desenvolvido para facilitar o acesso aos dados abertos do CNPJ da Receita Federal.** 
+**Desenvolvido para facilitar o acesso aos dados abertos do CNPJ da Receita Federal.**
+
+## 📊 Dashboard Interativo
+
+O projeto inclui um dashboard interativo em Streamlit para explorar e visualizar os dados Parquet gerados.
+
+### Como executar o dashboard
+
+Execute o serviço do dashboard de forma independente (não depende de download ou importação):
+
+```sh
+docker-compose up dashboard
+```
+
+Acesse no navegador:
+
+[http://localhost:8501](http://localhost:8501)
+
+- O dashboard permite visualizar estatísticas, amostras, gráficos e fazer buscas nos dados Parquet.
+- Não é necessário rodar download ou importação juntos para visualizar os dados já existentes.

@@ -58,4 +58,9 @@ README.md
 
 # Arquivos temporários
 *.tmp
-*.temp 
+*.temp
+
+# Adicionar novas linhas para ignorar a pasta parquet/ e arquivos .pdf, .url
+parquet/
+*.pdf
+*.url 
